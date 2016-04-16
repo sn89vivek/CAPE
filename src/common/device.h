@@ -21,5 +21,6 @@
 #include "driverlib/pwm.h"
 #include "driverlib/timer.h"
 #include "driverlib/adc.h"
+#include "driverlib/fpu.h"
 
 #endif /* SRC_COMMON_DEVICE_H_ */

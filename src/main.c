@@ -25,8 +25,12 @@
 #include "device.h"
 #include "pll.h"
 #include "measurements.h"
+#include "fft_test.h"
 
 volatile uint8_t scheduler_flag;
+
+
+
 int main(void)
 {
   //
@@ -35,6 +39,13 @@ int main(void)
   ROM_SysCtlClockFreqSet((SYSCTL_XTAL_25MHZ |
   SYSCTL_OSC_MAIN | SYSCTL_USE_PLL |
   SYSCTL_CFG_VCO_480), 120000000);
+
+//  FPUEnable();
+//  FPULazyStackingEnable();
+
+  /* FFT test */
+//  generate_input();
+
 
   /* Init all global stuff */
   pll_init(&pll_s);
@@ -149,11 +160,23 @@ int main(void)
 
       /* PLL event */
       phase_locked_loop(&pll_s);
+
+//      /* Once very 5 cycles 80ms approx */
+//      if(fft_counter == 5)
+//      {
+//        fft_counter = 0;
+//        collect_fft_samples = false;
+//        fft_compute();
+//        collect_fft_samples = true;
+//      }
+//      else
+//      {
+//        fft_counter++;
+//      }
     }
   }
 }
 
-#define PI                    3.14159265359
 void sys_tick_handler()
 {
   volatile int32_t radians;
@@ -176,6 +199,13 @@ void sys_tick_handler()
     ROM_ADCSequenceDataGet(ADC0_BASE, 0, &ac_raw_adc_counts[0]);
     ROM_ADCIntClear(ADC0_BASE, 0);
 
+//    if(collect_fft_samples == true)
+//    {
+//      /* Build the fft samples array for current and voltage */
+//      norm_Vinst_IQ_samples[pll_s.sine_index/2] = _Q12toIQ24((int32_t)ac_raw_adc_counts[0])-_IQ(ADC_LEVEL_SHIFT);
+//      norm_Iinst_IQ_samples[pll_s.sine_index/2] = _Q12toIQ24((int32_t)ac_raw_adc_counts[1])-_IQ(ADC_LEVEL_SHIFT);
+//    }
+
     /* Square and accumulate adc channels (after removing offset) */
     ac_metrics.Vac.norm_acc += _IQmpy(
         (_Q12toIQ24(((int32_t)ac_raw_adc_counts[0]))-_IQ(ADC_LEVEL_SHIFT)),
@@ -192,13 +222,12 @@ void sys_tick_handler()
         (_Q12toIQ24((int32_t)ac_raw_adc_counts[1])-_IQ(ADC_LEVEL_SHIFT)));
   }
 
-  /* For PLL debug */
-  if (pll_s.sine_index == 0)
-  {
-    /* toggle port here */
-    HWREG(GPIO_PORTN_BASE + (1 << 2)) ^= 1;
-
-  }
+//  /* For PLL debug */
+//  if (pll_s.sine_index == 0)
+//  {
+//    /* toggle port here */
+//    HWREG(GPIO_PORTN_BASE + (1 << 2)) ^= 1;
+//  }
 
   /* Compute Rms parameters once every cycle */
   if (pll_s.sine_index == SINE_SAMPLE_SIZE - 1)
@@ -219,11 +248,8 @@ void sys_tick_handler()
     ac_metrics.P_apparent = ac_metrics.Vac.norm_rms * ac_metrics.Iac.norm_rms;
 
     /*TODO: calculate reactive power */
-  }
 
   /* Scheduler Flag is set to true once a cycle  */
-  if (pll_s.sine_index == SINE_SAMPLE_SIZE - 1)
-  {
     scheduler_flag = true;
   }
 
