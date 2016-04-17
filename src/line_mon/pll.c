@@ -50,7 +50,12 @@ void phase_locked_loop(pll_t *pll)
     else if(PHASE_LAG(shift_index))
       systick_next--;
   }
-  ROM_SysTickPeriodSet(systick_next);
+
+  if(systick_next < 3606) // 65 Hz
+    systick_next = 3606;
+  else if(systick_next > 4261) // 55 Hz
+    systick_next = 4261;
+    ROM_SysTickPeriodSet(systick_next);
 }
 
 
