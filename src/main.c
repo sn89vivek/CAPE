@@ -27,6 +27,13 @@
 #include "measurements.h"
 #include "fft_test.h"
 
+#include "grlib/grlib.h"
+#include "grlib/widget.h"
+#include "grlib/canvas.h"
+#include "grlib/pushbutton.h"
+#include "drivers/Kentec320x240x16_ssd2119_SPI.h"
+#include "drivers/touch.h"
+
 volatile uint8_t scheduler_flag;
 
 //TODO: Frequency
@@ -35,12 +42,70 @@ volatile uint8_t scheduler_flag;
 //TODO: pin mapping excel
 //TODO: A3 printouts
 
+// Libraries
+// 1. IQmath libraries
+// 2. driverlib
+// 3. dsplib-cm4f
+// 4. grlib
+
+extern const uint8_t g_pui8Image[];
+extern const uint8_t g_pui8Right24x23[];
+extern const uint8_t g_pui8RightSmall15x14[];
+extern const uint8_t g_pui8Left24x23[];
+extern const uint8_t g_pui8LeftSmall15x14[];
+uint32_t g_ui32SysClock;
+
+extern tCanvasWidget g_sBackground;
+extern tPushButtonWidget g_sPushBtn;
+void OnNext(tWidget *pWidget);
+void OnPrevious(tWidget *pWidget);
+
+RectangularButton(g_sNext, 0, 0, 0, &g_sKentec320x240x16_SSD2119, 296, 0, 23,
+    23, PB_STYLE_IMG, ClrGoldenrod, ClrGoldenrod, 0, 0, 0, 0, g_pui8Right24x23,
+    g_pui8RightSmall15x14, 0, 0, OnNext);
+
+RectangularButton(g_sPrevious, 0, 0, 0, &g_sKentec320x240x16_SSD2119, 0, 0, 23,
+    23, PB_STYLE_IMG, ClrGoldenrod, ClrGoldenrod, 0, 0, 0, 0, g_pui8Left24x23,
+    g_pui8LeftSmall15x14, 0, 0, OnPrevious);
+
+bool g_Led1On = false;
+bool g_Led2On = false;
+
+void OnNext(tWidget *pWidget)
+{
+  g_Led1On = !g_Led1On;
+  if (g_Led1On)
+  {
+    GPIOPinWrite(GPIO_PORTN_BASE, GPIO_PIN_0, 0xFF);
+  }
+  else
+  {
+    GPIOPinWrite(GPIO_PORTN_BASE, GPIO_PIN_0, 0x00);
+  }
+}
+
+void OnPrevious(tWidget *pWidget)
+{
+  g_Led2On = !g_Led2On;
+  if (g_Led2On)
+  {
+    GPIOPinWrite(GPIO_PORTN_BASE, GPIO_PIN_1, 0xFF);
+  }
+  else
+  {
+    GPIOPinWrite(GPIO_PORTN_BASE, GPIO_PIN_1, 0x00);
+  }
+}
+
 int main(void)
 {
+  tContext sContext;
+  tRectangle sRect;
+
   //
   // Set the clocking to run directly from the crystal at 120MHz.
   //
-  ROM_SysCtlClockFreqSet((SYSCTL_XTAL_25MHZ |
+  g_ui32SysClock = ROM_SysCtlClockFreqSet((SYSCTL_XTAL_25MHZ |
   SYSCTL_OSC_MAIN | SYSCTL_USE_PLL |
   SYSCTL_CFG_VCO_480), 120000000);
 
@@ -50,6 +115,50 @@ int main(void)
   /* FFT test */
   generate_input();
 
+  //
+  // Initialize the display driver.
+  //
+  Kentec320x240x16_SSD2119Init();
+
+  //
+  // Initialize the graphics context.
+  //
+  GrContextInit(&sContext, &g_sKentec320x240x16_SSD2119);
+
+  /* Code for Image display */
+//  ClrScreen();
+  GrImageDraw(&sContext, g_pui8Image, 0, 0);
+  GrFlush(&sContext);
+
+//  GrPage1_inital_setup();
+  //
+  // Fill the top 24 rows of the screen with blue to create the banner.
+  //
+  sRect.i16XMin = 0;
+  sRect.i16YMin = 0;
+  sRect.i16XMax = GrContextDpyWidthGet(&sContext) - 1;
+  sRect.i16YMax = 23;
+  GrContextForegroundSet(&sContext, ClrGoldenrod);
+  GrRectFill(&sContext, &sRect);
+
+  //
+  // Put a white box around the banner.
+  //
+  GrContextForegroundSet(&sContext, ClrBlack);
+  GrRectDraw(&sContext, &sRect);
+
+  //
+  // Put the application name in the middle of the banner.
+  //
+  GrContextFontSet(&sContext, &g_sFontCm20);
+  GrStringDrawCentered(&sContext, "Voltage Spectrum", -1,
+      GrContextDpyWidthGet(&sContext) / 2, 8, 0);
+
+  TouchScreenInit(g_ui32SysClock);
+  TouchScreenCallbackSet(WidgetPointerMessage);
+  WidgetAdd(WIDGET_ROOT, (tWidget *) &g_sNext);
+  WidgetAdd(WIDGET_ROOT, (tWidget *) &g_sPrevious);
+  WidgetPaint(WIDGET_ROOT);
 
   /* Init all global stuff */
   pll_init(&pll_s);
@@ -69,10 +178,11 @@ int main(void)
   }
 
   //
-  // Enable the GPIO pin for the LED (PN0).  Set the direction as output, and
+  // Enable the GPIO pin for the LED (PN0, PN1).  Set the direction as output, and
   // enable the GPIO pin for digital function.
   //
   ROM_GPIOPinTypeGPIOOutput(GPIO_PORTN_BASE, GPIO_PIN_0);
+  ROM_GPIOPinTypeGPIOOutput(GPIO_PORTN_BASE, GPIO_PIN_1);
 
   /* Systick period set to 30720Hz = (60Hz*512samples) */
   ROM_SysTickPeriodSet(3906);
@@ -152,10 +262,22 @@ int main(void)
   ROM_IntEnable(INT_TIMER0A);
 
   /* enable interrupt processing at CPU level */
+//  ROM_IntEnable(INT_ADC0SS3);
   ROM_IntMasterEnable();
+
+  ROM_ADCProcessorTrigger(ADC0_BASE, 3);
 
   while (1)
   {
+    /* Wait for conversion to be completed */
+    if (ROM_ADCIntStatus(ADC0_BASE, 3, false))
+    {
+      ROM_ADCIntClear(ADC0_BASE, 3);
+      ROM_ADCProcessorTrigger(ADC0_BASE, 3);
+      TouchScreenIntHandler();
+    }
+
+    WidgetMessageQueueProcess();
     /* Execute scheduled events */
     if (scheduler_flag == true)
     {
@@ -166,7 +288,7 @@ int main(void)
       phase_locked_loop(&pll_s);
 
       /* Once very 5 cycles 80ms approx */
-      if(fft_counter == 5)
+      if (fft_counter == 5)
       {
         fft_counter = 0;
         collect_fft_samples = false;
@@ -189,7 +311,7 @@ void sys_tick_handler()
   volatile int32_t sin;
   volatile uint16_t pwm_counts;
 
-  HWREG(GPIO_PORTN_BASE + (1 << 2)) = 1;
+//  HWREG(GPIO_PORTN_BASE + (1 << 2)) = 1;
 
   /* Calculate radians */
   radians = _IQmpy(_IQ(PI)<<1,
@@ -199,19 +321,21 @@ void sys_tick_handler()
   /* trigger adc on even sine index */
   if ((pll_s.sine_index & 0x01) == 0)
   {
-    ROM_ADCProcessorTrigger(ADC0_BASE, 0);
+    ROM_ADCProcessorTrigger(ADC1_BASE, 0);
   }
   else
   {
     /* read result in the odd cycle */
-    ROM_ADCSequenceDataGet(ADC0_BASE, 0, &ac_raw_adc_counts[0]);
-    ROM_ADCIntClear(ADC0_BASE, 0);
+    ROM_ADCSequenceDataGet(ADC1_BASE, 0, &ac_raw_adc_counts[0]);
+    ROM_ADCIntClear(ADC1_BASE, 0);
 
-    if(collect_fft_samples == true)
+    if (collect_fft_samples == true)
     {
       /* Build the fft samples array for current and voltage */
-      norm_Vinst_IQ_samples[pll_s.sine_index/2] = _Q12toIQ24((int32_t)ac_raw_adc_counts[0])-_IQ(ADC_LEVEL_SHIFT);
-      norm_Iinst_IQ_samples[pll_s.sine_index/2] = _Q12toIQ24((int32_t)ac_raw_adc_counts[1])-_IQ(ADC_LEVEL_SHIFT);
+      norm_Vinst_IQ_samples[pll_s.sine_index / 2] =
+      _Q12toIQ24((int32_t)ac_raw_adc_counts[0]) - _IQ(ADC_LEVEL_SHIFT);
+      norm_Iinst_IQ_samples[pll_s.sine_index / 2] =
+      _Q12toIQ24((int32_t)ac_raw_adc_counts[1]) - _IQ(ADC_LEVEL_SHIFT);
     }
 
     /* Square and accumulate adc channels (after removing offset) */
@@ -231,12 +355,11 @@ void sys_tick_handler()
   }
 
   /* For PLL debug */
-  if (pll_s.sine_index == 0)
-  {
-    /* toggle port here */
-    HWREG(GPIO_PORTN_BASE + (1 << 2)) ^= 1;
-  }
-
+//  if (pll_s.sine_index == 0)
+//  {
+//    /* toggle port here */
+//    HWREG(GPIO_PORTN_BASE + (1 << 2)) ^= 1;
+//  }
   /* Compute Rms parameters once every cycle */
   if (pll_s.sine_index == SINE_SAMPLE_SIZE - 1)
   {
@@ -254,15 +377,19 @@ void sys_tick_handler()
 
     /* TODO: Move out of ISR */
     /* Apparaent power */
-    ac_metrics.P_apparent = _IQmpy(ac_metrics.Vac.norm_rms, ac_metrics.Iac.norm_rms);
+    ac_metrics.P_apparent = _IQmpy(ac_metrics.Vac.norm_rms,
+        ac_metrics.Iac.norm_rms);
 
     /*Calculate reactive power */
-    ac_metrics.P_reactive =_IQsqrt(_IQmpy(ac_metrics.P_apparent,ac_metrics.P_apparent) -_IQmpy(ac_metrics.P_active,ac_metrics.P_active));
+    ac_metrics.P_reactive =
+        _IQsqrt(
+            _IQmpy(ac_metrics.P_apparent,ac_metrics.P_apparent) -_IQmpy(ac_metrics.P_active,ac_metrics.P_active));
 
     /*Calculate Power Factor */
-    ac_metrics.P_PowerFactor = _IQacos(_IQdiv(ac_metrics.P_active,ac_metrics.P_apparent));
+    ac_metrics.P_PowerFactor = _IQacos(
+        _IQdiv(ac_metrics.P_active,ac_metrics.P_apparent));
 
-  /* Scheduler Flag is set to true once a cycle  */
+    /* Scheduler Flag is set to true once a cycle  */
     scheduler_flag = true;
   }
 
@@ -291,7 +418,7 @@ void sys_tick_handler()
     ROM_PWMOutputState(PWM0_BASE, PWM_OUT_1_BIT, true);
   }
 
-  HWREG(GPIO_PORTN_BASE + (1 << 2)) = 0;
+//  HWREG(GPIO_PORTN_BASE + (1 << 2)) = 0;
 }
 
 void timer0_isr_handler()

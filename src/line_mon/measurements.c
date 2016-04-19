@@ -23,16 +23,16 @@ void init_adc()
   ROM_GPIOPinTypeADC(GPIO_PORTE_BASE, GPIO_PIN_1);
 
   /* Initialise ADC */
-  ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC0);
+  ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC1);
   /* Sequencer 0, Software trigger, highest priority */
-  ROM_ADCSequenceConfigure(ADC0_BASE, 0, ADC_TRIGGER_PROCESSOR, 0);
+  ROM_ADCSequenceConfigure(ADC1_BASE, 0, ADC_TRIGGER_PROCESSOR, 0);
   /* Step 0 of Sequencer 0, CH3 */
-  ROM_ADCSequenceStepConfigure(ADC0_BASE, 0, 0, ADC_CTL_CH3);
+  ROM_ADCSequenceStepConfigure(ADC1_BASE, 0, 0, ADC_CTL_CH3);
   /* Step 1 of Sequencer 0, CH2, End_channel, Generate interrupt */
-  ROM_ADCSequenceStepConfigure(ADC0_BASE, 0, 1,
+  ROM_ADCSequenceStepConfigure(ADC1_BASE, 0, 1,
       ADC_CTL_CH2 | ADC_CTL_IE | ADC_CTL_END);
   /* Enable sequencer */
-  ROM_ADCSequenceEnable(ADC0_BASE, 0);
+  ROM_ADCSequenceEnable(ADC1_BASE, 0);
 
   /* ac_metrics initialisation */
   ac_metrics.Iac.gain = _IQ(1.0);

@@ -43,6 +43,7 @@ static void IntDefaultHandler(void);
 //*****************************************************************************
 extern void sys_tick_handler();
 extern void timer0_isr_handler();
+extern void TouchScreenIntHandler(void);
 
 //*****************************************************************************
 //
