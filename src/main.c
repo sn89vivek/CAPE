@@ -32,6 +32,8 @@ volatile uint8_t scheduler_flag;
 //TODO: Frequency
 //TODO: THD voltage, current, power
 //TODO: power spectrum
+//TODO: pin mapping excel
+//TODO: A3 printouts
 
 int main(void)
 {
@@ -88,13 +90,13 @@ int main(void)
   /* M0PWM0 --> PF0. Enable Port F */
   ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
 
-  /* Configure the GPIO pin muxing to select PWM00 functions for these pins.
+  /* Configure the GPIO pin muxing to select PWM1 functions for these pins.
    * This step selects which alternate function is available for these pins.
    */
-  ROM_GPIOPinConfigure(GPIO_PF0_M0PWM0);
+  ROM_GPIOPinConfigure(GPIO_PF1_M0PWM1);
 
   /* Configure the PWM functionality for the pin */
-  ROM_GPIOPinTypePWM(GPIO_PORTF_BASE, GPIO_PIN_0);
+  ROM_GPIOPinTypePWM(GPIO_PORTF_BASE, GPIO_PIN_1);
 
   /* Configure PWM peripheral */
   /* PWM0 in count down mode */
@@ -113,12 +115,12 @@ int main(void)
   //
   // Set duty to 20% = .2 * 6000 =
   //
-  ROM_PWMPulseWidthSet(PWM0_BASE, PWM_OUT_0, 0);
+  ROM_PWMPulseWidthSet(PWM0_BASE, PWM_OUT_1, 0);
 
   //
-  // Enable the PWM0 output signal (PD0).
+  // Enable the PWM0 output signal (PF1).
   //
-  ROM_PWMOutputState(PWM0_BASE, PWM_OUT_0_BIT, true);
+  ROM_PWMOutputState(PWM0_BASE, PWM_OUT_1_BIT, true);
 
   //
   // Enables the PWM generator block.
@@ -282,11 +284,11 @@ void sys_tick_handler()
   /* drive duty */
   pwm_counts = _IQmpy(sin, 6000);
   if (pwm_counts == 0)
-    ROM_PWMOutputState(PWM0_BASE, PWM_OUT_0_BIT, false);
+    ROM_PWMOutputState(PWM0_BASE, PWM_OUT_1_BIT, false);
   else
   {
-    ROM_PWMPulseWidthSet(PWM0_BASE, PWM_OUT_0, pwm_counts);
-    ROM_PWMOutputState(PWM0_BASE, PWM_OUT_0_BIT, true);
+    ROM_PWMPulseWidthSet(PWM0_BASE, PWM_OUT_1, pwm_counts);
+    ROM_PWMOutputState(PWM0_BASE, PWM_OUT_1_BIT, true);
   }
 
   HWREG(GPIO_PORTN_BASE + (1 << 2)) = 0;
