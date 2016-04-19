@@ -14,10 +14,10 @@ float32_t sine_test_input[FFT_LENGTH];
 
 uint8_t collect_fft_samples = 1;
 uint8_t fft_counter = 0;
-//_iq norm_Iinst_IQ_samples[FFT_LENGTH];
+_iq norm_Iinst_IQ_samples[FFT_LENGTH];
 _iq norm_Vinst_IQ_samples[FFT_LENGTH];
 float32_t fft_output_array_voltage[FFT_LENGTH];
-//float32_t fft_output_array_current[FFT_LENGTH];
+float32_t fft_output_array_current[FFT_LENGTH];
 float32_t fft_input_array[FFT_LENGTH];
 arm_rfft_fast_instance_f32 rfft_fast_len256;
 
@@ -84,8 +84,12 @@ void fft_compute()
   /* voltage array */
   for(i = 0; i < FFT_LENGTH; i++)
     fft_input_array[i] = norm_Vinst_IQ_samples[i]/16777216.0;
-
   fft(&rfft_fast_len256, fft_input_array, fft_output_array_voltage);
+
+  /* current array */
+  for(i = 0; i < FFT_LENGTH; i++)
+    fft_input_array[i] = norm_Iinst_IQ_samples[i]/16777216.0;
+  fft(&rfft_fast_len256, fft_input_array, fft_output_array_current);
 
 //    buff1[i] = norm_Vinst_IQ_samples[i]/16777216.0;
 

@@ -26,6 +26,7 @@ typedef struct
     _iq P_active;
     _iq P_inst_acc;
     _iq P_reactive;
+    _iq P_PowerFactor;
 } ac_metrics_t;
 
 extern ac_metrics_t ac_metrics;

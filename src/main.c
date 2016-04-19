@@ -29,7 +29,9 @@
 
 volatile uint8_t scheduler_flag;
 
-
+//TODO: Frequency
+//TODO: THD voltage, current, power
+//TODO: power spectrum
 
 int main(void)
 {
@@ -207,7 +209,7 @@ void sys_tick_handler()
     {
       /* Build the fft samples array for current and voltage */
       norm_Vinst_IQ_samples[pll_s.sine_index/2] = _Q12toIQ24((int32_t)ac_raw_adc_counts[0])-_IQ(ADC_LEVEL_SHIFT);
-//      norm_Iinst_IQ_samples[pll_s.sine_index/2] = _Q12toIQ24((int32_t)ac_raw_adc_counts[1])-_IQ(ADC_LEVEL_SHIFT);
+      norm_Iinst_IQ_samples[pll_s.sine_index/2] = _Q12toIQ24((int32_t)ac_raw_adc_counts[1])-_IQ(ADC_LEVEL_SHIFT);
     }
 
     /* Square and accumulate adc channels (after removing offset) */
@@ -248,10 +250,15 @@ void sys_tick_handler()
     ac_metrics.P_active = ac_metrics.P_inst_acc >> 8;
     ac_metrics.P_inst_acc = 0;
 
+    /* TODO: Move out of ISR */
     /* Apparaent power */
-    ac_metrics.P_apparent = ac_metrics.Vac.norm_rms * ac_metrics.Iac.norm_rms;
+    ac_metrics.P_apparent = _IQmpy(ac_metrics.Vac.norm_rms, ac_metrics.Iac.norm_rms);
 
-    /*TODO: calculate reactive power */
+    /*Calculate reactive power */
+    ac_metrics.P_reactive =_IQsqrt(_IQmpy(ac_metrics.P_apparent,ac_metrics.P_apparent) -_IQmpy(ac_metrics.P_active,ac_metrics.P_active));
+
+    /*Calculate Power Factor */
+    ac_metrics.P_PowerFactor = _IQacos(_IQdiv(ac_metrics.P_active,ac_metrics.P_apparent));
 
   /* Scheduler Flag is set to true once a cycle  */
     scheduler_flag = true;

@@ -17,10 +17,10 @@ extern float32_t sine_test_input[FFT_LENGTH];
 
 extern uint8_t collect_fft_samples;
 extern uint8_t fft_counter;
-//extern _iq norm_Iinst_IQ_samples[FFT_LENGTH];
+extern _iq norm_Iinst_IQ_samples[FFT_LENGTH];
 extern _iq norm_Vinst_IQ_samples[FFT_LENGTH];
 extern float32_t fft_output_array_voltage[FFT_LENGTH];
-//extern float32_t fft_output_array_current[FFT_LENGTH];
+extern float32_t fft_output_array_current[FFT_LENGTH];
 
 extern void fft_compute();
 extern void generate_input();
