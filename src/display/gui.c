@@ -1,0 +1,343 @@
+/*
+ * display_operations.c
+ *
+ *  Created on: Apr 21, 2016
+ *      Author: Vivek
+ */
+
+#include "gui.h"
+
+tContext sContext;
+tRectangle sRect;
+uint8_t g_uiSpectrum = 0;
+int8_t g_iPage = 0;
+void OnNext(tWidget *pWidget);
+void OnPrevious(tWidget *pWidget);
+
+Canvas(g_sTitlePanel, 0, 0, 0, &g_sKentec320x240x16_SSD2119, 0, 0, 320, 24,
+    CANVAS_STYLE_TEXT | CANVAS_STYLE_FILL, ClrCUYellow, 0, ClrBlack,
+    &g_sFontCm20b, "AC Metrics", 0, 0);
+
+Canvas(g_sACMetricsWidget, 0, 0, &g_sVrms, &g_sKentec320x240x16_SSD2119, 0, 0,
+    1, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+
+Canvas(g_sVrms, &g_sACMetricsWidget, 0, &g_sVrmsValue,
+    &g_sKentec320x240x16_SSD2119, 0, 30, 60, 28,
+    CANVAS_STYLE_TEXT | CANVAS_STYLE_TEXT_LEFT, 0, ClrCUYellow, ClrCUYellow,
+    &g_sFontCm16b, "Vrms", 0, 0);
+
+Canvas(g_sVrmsValue, &g_sVrms, 0, &g_sIrms, &g_sKentec320x240x16_SSD2119, 55,
+    30, 60, 28, CANVAS_STYLE_FILL | CANVAS_STYLE_TEXT, ClrCUYellow, 0, ClrBlack,
+    &g_sFontCm18, "123.4 V", 0, 0);
+
+Canvas(g_sIrms, &g_sVrmsValue, 0, &g_sIrmsValue, &g_sKentec320x240x16_SSD2119,
+    0, 60, 60, 28, CANVAS_STYLE_TEXT | CANVAS_STYLE_TEXT_LEFT, 0, ClrCUYellow,
+    ClrCUYellow, &g_sFontCm16b, "Irms", 0, 0);
+
+Canvas(g_sIrmsValue, &g_sIrms, 0, &g_sFreq, &g_sKentec320x240x16_SSD2119, 55,
+    60, 60, 28, CANVAS_STYLE_FILL | CANVAS_STYLE_TEXT, ClrCUYellow, 0, ClrBlack,
+    &g_sFontCm18, "6.0  A", 0, 0);
+
+Canvas(g_sFreq, &g_sIrmsValue, 0, &g_sFreqValue, &g_sKentec320x240x16_SSD2119,
+    0, 90, 60, 28, CANVAS_STYLE_TEXT | CANVAS_STYLE_TEXT_LEFT, 0, ClrCUYellow,
+    ClrCUYellow, &g_sFontCm16b, "Freq", 0, 0);
+
+Canvas(g_sFreqValue, &g_sFreq, 0, &g_sPF, &g_sKentec320x240x16_SSD2119, 55, 90,
+    60, 28, CANVAS_STYLE_FILL | CANVAS_STYLE_TEXT, ClrCUYellow, 0, ClrBlack,
+    &g_sFontCm18, "59.9 Hz", 0, 0);
+
+Canvas(g_sPF, &g_sFreqValue, 0, &g_sPFValue, &g_sKentec320x240x16_SSD2119, 0,
+    120, 60, 28, CANVAS_STYLE_TEXT | CANVAS_STYLE_TEXT_LEFT, 0, ClrCUYellow,
+    ClrCUYellow, &g_sFontCm16b, "PF  ", 0, 0);
+
+Canvas(g_sPFValue, &g_sPF, 0, &g_sP_apparent, &g_sKentec320x240x16_SSD2119, 55,
+    120, 60, 28, CANVAS_STYLE_FILL | CANVAS_STYLE_TEXT, ClrCUYellow, 0,
+    ClrBlack, &g_sFontCm18, "0.99", 0, 0);
+
+Canvas(g_sP_apparent, &g_sPFValue, 0, &g_sP_apparent_val,
+    &g_sKentec320x240x16_SSD2119, 204, 30, 60, 28,
+    CANVAS_STYLE_TEXT | CANVAS_STYLE_TEXT_LEFT, 0, ClrCUYellow, ClrCUYellow,
+    &g_sFontCm16b, "P (VA)", 0, 0);
+
+Canvas(g_sP_apparent_val, &g_sP_apparent, 0, &g_sP_active,
+    &g_sKentec320x240x16_SSD2119, 259, 30, 60, 28,
+    CANVAS_STYLE_FILL | CANVAS_STYLE_TEXT, ClrCUYellow, 0, ClrBlack,
+    &g_sFontCm18, "720.5", 0, 0);
+
+Canvas(g_sP_active, &g_sP_apparent, 0, &g_sP_active_val,
+    &g_sKentec320x240x16_SSD2119, 204, 60, 60, 28,
+    CANVAS_STYLE_TEXT | CANVAS_STYLE_TEXT_LEFT, 0, ClrCUYellow, ClrCUYellow,
+    &g_sFontCm16b, "P (W)", 0, 0);
+
+Canvas(g_sP_active_val, &g_sP_active, 0, &g_sTHDv, &g_sKentec320x240x16_SSD2119,
+    259, 60, 60, 28, CANVAS_STYLE_FILL | CANVAS_STYLE_TEXT, ClrCUYellow, 0,
+    ClrBlack, &g_sFontCm18, "740.9", 0, 0);
+
+Canvas(g_sTHDv, &g_sP_active_val, 0, &g_sTHDv_val, &g_sKentec320x240x16_SSD2119,
+    0, 150, 60, 28, CANVAS_STYLE_TEXT | CANVAS_STYLE_TEXT_LEFT, 0, ClrCUYellow,
+    ClrCUYellow, &g_sFontCm16b, "Thd(V)", 0, 0);
+
+Canvas(g_sTHDv_val, &g_sTHDv, 0, &g_sTHDi, &g_sKentec320x240x16_SSD2119, 55,
+    150, 60, 28, CANVAS_STYLE_FILL | CANVAS_STYLE_TEXT, ClrCUYellow, 0,
+    ClrBlack, &g_sFontCm18, "2.1 %", 0, 0);
+
+Canvas(g_sTHDi, &g_sTHDv_val, 0, &g_sTHDi_val, &g_sKentec320x240x16_SSD2119, 0,
+    180, 60, 28, CANVAS_STYLE_TEXT | CANVAS_STYLE_TEXT_LEFT, 0, ClrCUYellow,
+    ClrCUYellow, &g_sFontCm16b, "Thd(I)", 0, 0);
+
+Canvas(g_sTHDi_val, &g_sTHDi, 0, &g_sPhase, &g_sKentec320x240x16_SSD2119, 55,
+    180, 60, 28, CANVAS_STYLE_FILL | CANVAS_STYLE_TEXT, ClrCUYellow, 0,
+    ClrBlack, &g_sFontCm18, "7.5 %", 0, 0);
+
+Canvas(g_sPhase, &g_sTHDv_val, 0, &g_sPhase_val, &g_sKentec320x240x16_SSD2119,
+    0, 210, 60, 28, CANVAS_STYLE_TEXT | CANVAS_STYLE_TEXT_LEFT, 0, ClrCUYellow,
+    ClrCUYellow, &g_sFontCm16b, "Phase", 0, 0);
+
+Canvas(g_sPhase_val, &g_sPhase, 0, 0, &g_sKentec320x240x16_SSD2119, 55, 210, 60,
+    28, CANVAS_STYLE_FILL | CANVAS_STYLE_TEXT, ClrCUYellow, 0, ClrBlack,
+    &g_sFontCm18, "7.5 %", 0, 0);
+
+RectangularButton(g_sNext, 0, 0, 0, &g_sKentec320x240x16_SSD2119, 296, 0, 23,
+    23, PB_STYLE_IMG, ClrCUYellow, ClrCUYellow, 0, 0, 0, 0, g_pui8Right24x23,
+    g_pui8RightSmall15x14, 0, 0, OnNext);
+
+RectangularButton(g_sPrevious, 0, 0, 0, &g_sKentec320x240x16_SSD2119, 0, 0, 23,
+    23, PB_STYLE_IMG, ClrCUYellow, ClrCUYellow, 0, 0, 0, 0, g_pui8Left24x23,
+    g_pui8LeftSmall15x14, 0, 0, OnPrevious);
+
+bool g_Led1On = false;
+bool g_Led2On = false;
+
+void OnNext(tWidget *pWidget)
+{
+  g_Led1On = !g_Led1On;
+  if (g_Led1On)
+  {
+    GPIOPinWrite(GPIO_PORTN_BASE, GPIO_PIN_0, 0xFF);
+  }
+  else
+  {
+    GPIOPinWrite(GPIO_PORTN_BASE, GPIO_PIN_0, 0x00);
+  }
+
+  /* Page increment and wraparound */
+  g_iPage++;
+  if (g_iPage == LAST_PAGE + 1)
+    g_iPage = 0;
+
+  display_setup_page(g_iPage);
+}
+
+void OnPrevious(tWidget *pWidget)
+{
+  g_Led2On = !g_Led2On;
+  if (g_Led2On)
+  {
+    GPIOPinWrite(GPIO_PORTN_BASE, GPIO_PIN_1, 0xFF);
+  }
+  else
+  {
+    GPIOPinWrite(GPIO_PORTN_BASE, GPIO_PIN_1, 0x00);
+  }
+
+  /* Page decrement and wraparound */
+  g_iPage--;
+  if (g_iPage == -1)
+    g_iPage = LAST_PAGE;
+
+  display_setup_page(g_iPage);
+
+}
+
+extern uint32_t g_ui32SysClock;
+
+void gui_init()
+{
+  //
+  // Initialize the display driver.
+  //
+  Kentec320x240x16_SSD2119Init();
+
+  //
+  // Initialize the graphics context.
+  //
+  GrContextInit(&sContext, &g_sKentec320x240x16_SSD2119);
+
+  /* Draw logo */
+  GrImageDraw(&sContext, g_pui8Image, 0, 0);
+  GrFlush(&sContext);
+
+  TouchScreenInit(g_ui32SysClock);
+  TouchScreenCallbackSet(WidgetPointerMessage);
+
+  WidgetAdd(WIDGET_ROOT, (tWidget *) &g_sTitlePanel);
+  WidgetAdd(WIDGET_ROOT, (tWidget *) &g_sNext);
+  WidgetAdd(WIDGET_ROOT, (tWidget *) &g_sPrevious);
+  WidgetAdd(WIDGET_ROOT, (tWidget *) &g_sACMetricsWidget);
+  WidgetPaint(WIDGET_ROOT);
+}
+
+void display_setup_page(int8_t page_no)
+{
+  if (page_no == PAGE_METRICS)
+  {
+    /* Draw logo */
+    GrImageDraw(&sContext, g_pui8Image, 0, 0);
+    GrFlush(&sContext);
+
+    /* Change title text */
+    CanvasTextSet(&g_sTitlePanel, "AC Metrics");
+
+    /* Add the metrics canvas widget */
+    WidgetAdd(WIDGET_ROOT, (tWidget *) &g_sACMetricsWidget);
+  }
+  else if ((page_no == PAGE_VOLTAGE_SPECTRUM)
+      || (page_no == PAGE_CURRENT_SPECTRUM))
+  {
+    /* fill screen with black. No logo */
+    sRect.i16XMin = 0;
+    sRect.i16YMin = 0;
+    sRect.i16XMax = 319;
+    sRect.i16YMax = 239;
+    GrContextForegroundSet(&sContext, ClrBlack);
+    GrRectFill(&sContext, &sRect);
+
+    /* Add the metrics canvas widget */
+    WidgetRemove((tWidget *) &g_sACMetricsWidget);
+
+    /* Draw the frequency base */
+    sRect.i16XMin = 0;
+    sRect.i16YMin = 229;
+    sRect.i16XMax = 319;
+    sRect.i16YMax = 231;
+    GrContextForegroundSet(&sContext, ClrCUYellow);
+    GrRectFill(&sContext, &sRect);
+
+    /* Change title text */
+    if (page_no == PAGE_VOLTAGE_SPECTRUM)
+    {
+      CanvasTextSet(&g_sTitlePanel, "Voltage Spectrum");
+      g_uiSpectrum = VOLTAGE_SPECTRUM;
+    }
+    else
+    {
+      CanvasTextSet(&g_sTitlePanel, "Current Spectrum");
+      g_uiSpectrum = CURRENT_SPECTRUM;
+    }
+  }
+
+  else if ((page_no == PAGE_TIME_DOMAIN_SIGNAL))
+  {
+    CanvasTextSet(&g_sTitlePanel, "Time Domain Signal");
+
+    sRect.i16XMin = 0;
+    sRect.i16YMin = 0;
+    sRect.i16XMax = 319;
+    sRect.i16YMax = 239;
+    GrContextForegroundSet(&sContext, ClrBlack);
+    GrRectFill(&sContext, &sRect);
+
+    /* Add the metrics canvas widget */
+    WidgetRemove((tWidget *) &g_sACMetricsWidget);
+  }
+
+  /* Draw the widgets */
+  WidgetPaint(WIDGET_ROOT);
+}
+
+void Display_FreqSpectrum(uint8_t param)
+{
+  /* We will use 20 bins to store 20 frequency amplitudes */
+  int32_t frequency_bins[20];
+  uint8_t i;
+
+  /* Wipe the previous FFT */
+  sRect.i16XMin = 0;
+  sRect.i16YMin = 30;
+  sRect.i16XMax = 319;
+  sRect.i16YMax = 228;
+  GrContextForegroundSet(&sContext, ClrBlack);
+
+  GrRectFill(&sContext, &sRect);
+
+  GrContextForegroundSet(&sContext, ClrCUYellow);
+
+  if (param == VOLTAGE_SPECTRUM)
+  {
+    for (i = 0; i < 20; i++)
+    {
+      /* Scale the frequency bin values with the y axis span of the spectrum canvas */
+      frequency_bins[i] = 229
+          - (int32_t) (fft_output_array_voltage[i] * (240.0 - 40.0));
+    }
+  }
+  else if (param == CURRENT_SPECTRUM)
+  {
+    for (i = 0; i < 20; i++)
+    {
+      /* Scale the frequency bin values with the y axis span of the spectrum canvas */
+      frequency_bins[i] = 229
+          - (int32_t) (fft_output_array_current[i] * (240.0 - 40.0));
+    }
+  }
+
+  /* frequency bin now  contains y points */
+  for (i = 0; i < 20; i++)
+  {
+    //GrLineDrawV(&sContext,i*16,229,frequency_bins[i]);
+    GrLineDraw(&sContext, (i * 16 - 4), 229, i * 16, frequency_bins[i]);
+    GrLineDraw(&sContext, (i * 16), frequency_bins[i], (i * 16 + 4), 229);
+  }
+
+  fft_output_array_voltage[0] = CURRENT_SPECTRUM;
+}
+
+void Display_TimeDomain(void)
+{
+  uint32_t XPixelCurrent = 0;
+  static uint32_t YPixelCurrent[FFT_LENGTH] =
+  { 100 };
+  static uint32_t YPixelPrev[FFT_LENGTH] =
+  { 0 };
+  uint32_t DataCount = 0;
+
+  /*Wipe the previous FFT*/
+//  sRect.i16XMin = 0;
+//  sRect.i16YMin = 29;
+//  sRect.i16XMax = 319;
+//  sRect.i16YMax = 239;
+//  GrContextForegroundSet(&sContext, ClrBlack);
+//
+//  GrRectFill(&sContext, &sRect);
+  GrContextForegroundSet(&sContext, ClrSilver);
+  GrLineDrawH(&sContext, 0, 319, 100);
+
+  DataCount = 0;
+  while (DataCount < FFT_LENGTH)
+  {
+//    GrContextForegroundSet(&sContext, ClrBlack);
+//    GrPixelDraw(&sContext,XPixelCurrent,YPixelPrev[DataCount]);
+//    if(DataCount != 0)
+    YPixelCurrent[DataCount] = 100
+        - 100 * ((norm_Vinst_IQ_samples[DataCount]) / 16777216.0);
+    if (DataCount != 0)
+    {
+      GrContextForegroundSet(&sContext, ClrBlack);
+      GrLineDraw(&sContext, XPixelCurrent - 1, YPixelPrev[DataCount - 1],
+          XPixelCurrent, YPixelPrev[DataCount]);
+      GrContextForegroundSet(&sContext, ClrCUYellow);
+      GrLineDraw(&sContext, XPixelCurrent - 1, YPixelCurrent[DataCount - 1],
+          XPixelCurrent, YPixelCurrent[DataCount]);
+    }
+    DataCount++;
+    XPixelCurrent++;
+  }
+
+  DataCount = 0;
+  while (DataCount < FFT_LENGTH)
+  {
+    YPixelPrev[DataCount] = YPixelCurrent[DataCount];
+    DataCount++;
+  }
+}
+

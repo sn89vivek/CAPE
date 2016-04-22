@@ -9,6 +9,7 @@
 #define SRC_LINE_MON_MEASUREMENTS_H_
 
 #include "device.h"
+#include "arm_math.h"
 
 typedef struct
 {
@@ -27,6 +28,10 @@ typedef struct
     _iq P_inst_acc;
     _iq P_reactive;
     _iq P_PowerFactor;
+    _iq Phase_shift;
+    _iq frqequncy;
+    float32_t Vthd;
+    float32_t Ithd;
 } ac_metrics_t;
 
 extern ac_metrics_t ac_metrics;
@@ -34,6 +39,10 @@ extern uint32_t ac_raw_adc_counts[2];
 
 #define ADC_LEVEL_SHIFT   (0.5)
 #define _Q12toIQ24(A)     ((int32_t)A<<12)
+#define V_FULL_SCALE  400.0
+#define I_FULL_SCALE  49.5
+#define P_FULL_SCALE  V_FULL_SCALE*I_FULL_SCALE
+#define IQ24toFloat   16777216.0
 
 extern void init_adc();
 

@@ -33,75 +33,34 @@
 #include "grlib/pushbutton.h"
 #include "drivers/Kentec320x240x16_ssd2119_SPI.h"
 #include "drivers/touch.h"
+#include "gui.h"
 
 volatile uint8_t scheduler_flag;
 
-//TODO: Frequency
-//TODO: THD voltage, current, power
-//TODO: power spectrum
-//TODO: pin mapping excel
+//TODO: THD power
+//TODO: CAN communication, Waveform generator
 //TODO: A3 printouts
+//TODO: Vp, Ip
 
 // Libraries
 // 1. IQmath libraries
 // 2. driverlib
 // 3. dsplib-cm4f
 // 4. grlib
-
-extern const uint8_t g_pui8Image[];
-extern const uint8_t g_pui8Right24x23[];
-extern const uint8_t g_pui8RightSmall15x14[];
-extern const uint8_t g_pui8Left24x23[];
-extern const uint8_t g_pui8LeftSmall15x14[];
+int8_t time_domain_disp_count;
+char display_update_buffer1[10];
+char display_update_buffer2[10];
+char display_update_buffer3[10];
+char display_update_buffer4[10];
+char display_update_buffer5[10];
+char display_update_buffer6[10];
+char display_update_buffer7[10];
+char display_update_buffer8[10];
+char display_update_buffer9[10];
 uint32_t g_ui32SysClock;
-
-extern tCanvasWidget g_sBackground;
-extern tPushButtonWidget g_sPushBtn;
-void OnNext(tWidget *pWidget);
-void OnPrevious(tWidget *pWidget);
-
-RectangularButton(g_sNext, 0, 0, 0, &g_sKentec320x240x16_SSD2119, 296, 0, 23,
-    23, PB_STYLE_IMG, ClrGoldenrod, ClrGoldenrod, 0, 0, 0, 0, g_pui8Right24x23,
-    g_pui8RightSmall15x14, 0, 0, OnNext);
-
-RectangularButton(g_sPrevious, 0, 0, 0, &g_sKentec320x240x16_SSD2119, 0, 0, 23,
-    23, PB_STYLE_IMG, ClrGoldenrod, ClrGoldenrod, 0, 0, 0, 0, g_pui8Left24x23,
-    g_pui8LeftSmall15x14, 0, 0, OnPrevious);
-
-bool g_Led1On = false;
-bool g_Led2On = false;
-
-void OnNext(tWidget *pWidget)
-{
-  g_Led1On = !g_Led1On;
-  if (g_Led1On)
-  {
-    GPIOPinWrite(GPIO_PORTN_BASE, GPIO_PIN_0, 0xFF);
-  }
-  else
-  {
-    GPIOPinWrite(GPIO_PORTN_BASE, GPIO_PIN_0, 0x00);
-  }
-}
-
-void OnPrevious(tWidget *pWidget)
-{
-  g_Led2On = !g_Led2On;
-  if (g_Led2On)
-  {
-    GPIOPinWrite(GPIO_PORTN_BASE, GPIO_PIN_1, 0xFF);
-  }
-  else
-  {
-    GPIOPinWrite(GPIO_PORTN_BASE, GPIO_PIN_1, 0x00);
-  }
-}
 
 int main(void)
 {
-  tContext sContext;
-  tRectangle sRect;
-
   //
   // Set the clocking to run directly from the crystal at 120MHz.
   //
@@ -115,55 +74,12 @@ int main(void)
   /* FFT test */
   generate_input();
 
-  //
-  // Initialize the display driver.
-  //
-  Kentec320x240x16_SSD2119Init();
-
-  //
-  // Initialize the graphics context.
-  //
-  GrContextInit(&sContext, &g_sKentec320x240x16_SSD2119);
-
-  /* Code for Image display */
-//  ClrScreen();
-  GrImageDraw(&sContext, g_pui8Image, 0, 0);
-  GrFlush(&sContext);
-
-//  GrPage1_inital_setup();
-  //
-  // Fill the top 24 rows of the screen with blue to create the banner.
-  //
-  sRect.i16XMin = 0;
-  sRect.i16YMin = 0;
-  sRect.i16XMax = GrContextDpyWidthGet(&sContext) - 1;
-  sRect.i16YMax = 23;
-  GrContextForegroundSet(&sContext, ClrGoldenrod);
-  GrRectFill(&sContext, &sRect);
-
-  //
-  // Put a white box around the banner.
-  //
-  GrContextForegroundSet(&sContext, ClrBlack);
-  GrRectDraw(&sContext, &sRect);
-
-  //
-  // Put the application name in the middle of the banner.
-  //
-  GrContextFontSet(&sContext, &g_sFontCm20);
-  GrStringDrawCentered(&sContext, "Voltage Spectrum", -1,
-      GrContextDpyWidthGet(&sContext) / 2, 8, 0);
-
-  TouchScreenInit(g_ui32SysClock);
-  TouchScreenCallbackSet(WidgetPointerMessage);
-  WidgetAdd(WIDGET_ROOT, (tWidget *) &g_sNext);
-  WidgetAdd(WIDGET_ROOT, (tWidget *) &g_sPrevious);
-  WidgetPaint(WIDGET_ROOT);
-
   /* Init all global stuff */
   pll_init(&pll_s);
   scheduler_flag = false;
   init_adc();
+
+  gui_init();
 
   //
   // Enable the GPIO port that is used for the on-board LED.
@@ -301,6 +217,79 @@ int main(void)
       {
         fft_counter++;
       }
+
+      if (time_domain_disp_count == 50)
+      {
+        time_domain_disp_count = 0;
+
+        if (g_iPage == PAGE_METRICS)
+        {
+          // Updating Vrms //
+          sprintf(display_update_buffer1, "%.1f V",
+              ac_metrics.Vac.norm_rms * V_FULL_SCALE / IQ24toFloat);
+          CanvasTextSet(&g_sVrmsValue, (const char * )display_update_buffer1);
+
+          // Updating Irms //
+          sprintf(display_update_buffer2, "%.1f A",
+              ac_metrics.Iac.norm_rms * I_FULL_SCALE / IQ24toFloat);
+          CanvasTextSet(&g_sIrmsValue, (const char * )display_update_buffer2);
+
+          // Updating Frequency //
+          sprintf(display_update_buffer3, "%.1f Hz",
+              120000000.0 / pll_s.freq_in_cap_counts);
+          CanvasTextSet(&g_sFreqValue, (const char * )display_update_buffer3);
+
+          // Updating Power Factor //
+          sprintf(display_update_buffer4, "%.1f",
+              ac_metrics.P_PowerFactor / IQ24toFloat);
+          CanvasTextSet(&g_sPFValue, (const char * )display_update_buffer4);
+
+          // Updating Apparent Power //
+          sprintf(display_update_buffer5, "%.1f",
+              ac_metrics.P_apparent * P_FULL_SCALE / IQ24toFloat);
+          CanvasTextSet(&g_sP_apparent_val,
+              (const char * )display_update_buffer5);
+
+          // Updating active Power //
+          sprintf(display_update_buffer6, "%.1f",
+              ac_metrics.P_active * P_FULL_SCALE / IQ24toFloat);
+          CanvasTextSet(&g_sP_active_val,
+              (const char * )display_update_buffer6);
+
+          // Updating THD Voltage //
+          sprintf(display_update_buffer7, "%.1f %%", ac_metrics.Vthd);
+          CanvasTextSet(&g_sTHDv_val, (const char * )display_update_buffer7);
+
+          // Updating THD Current //
+          sprintf(display_update_buffer8, "%.1f %%", ac_metrics.Ithd);
+          CanvasTextSet(&g_sTHDi_val, (const char * )display_update_buffer8);
+
+          // Updating Phase  //
+          sprintf(display_update_buffer9, "%.1f dg",
+              ac_metrics.Phase_shift * (180 / PI) / IQ24toFloat);
+          CanvasTextSet(&g_sPhase_val, (const char * )display_update_buffer9);
+
+          WidgetPaint(WIDGET_ROOT);  // painting the updated canvases
+        }
+        else if (g_iPage == PAGE_VOLTAGE_SPECTRUM)
+        {
+
+          Display_FreqSpectrum(VOLTAGE_SPECTRUM);
+        }
+        else if (g_iPage == PAGE_CURRENT_SPECTRUM)
+        {
+          Display_FreqSpectrum(CURRENT_SPECTRUM);
+        }
+        else if (g_iPage == PAGE_TIME_DOMAIN_SIGNAL)
+        {
+          Display_TimeDomain();
+        }
+      }
+      else
+      {
+        time_domain_disp_count++;
+      }
+
     }
   }
 }
@@ -386,8 +375,14 @@ void sys_tick_handler()
             _IQmpy(ac_metrics.P_apparent,ac_metrics.P_apparent) -_IQmpy(ac_metrics.P_active,ac_metrics.P_active));
 
     /*Calculate Power Factor */
-    ac_metrics.P_PowerFactor = _IQacos(
+    ac_metrics.P_PowerFactor = _IQdiv(ac_metrics.P_active,
+        ac_metrics.P_apparent);
+
+    /* Calculate Phase Shift b/w sinusoid current and voltage waveform */
+    ac_metrics.Phase_shift = _IQacos(
         _IQdiv(ac_metrics.P_active,ac_metrics.P_apparent));
+
+    // ac_metrics.frqequncy =
 
     /* Scheduler Flag is set to true once a cycle  */
     scheduler_flag = true;

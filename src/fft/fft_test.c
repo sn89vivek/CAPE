@@ -5,10 +5,10 @@
  *      Author: Vivek
  */
 
-
 #include "fft_test.h"
 #include <math.h>
 #include "arm_const_structs.h"
+#include "measurements.h"
 
 float32_t sine_test_input[FFT_LENGTH];
 
@@ -25,7 +25,6 @@ volatile double buff1[256];
 
 /* vars for this file */
 //static float32_t testOutput[FFT_LENGTH];
-
 /* Reference index at which max energy of bin ocuurs */
 uint32_t refIndex = 213, testIndex = 0;
 
@@ -34,11 +33,13 @@ void generate_input()
   uint16_t i;
 
   /* generate radians */
-  for(i = 0; i < FFT_LENGTH; i++)
-    sine_test_input[i] = i*2*PI/FFT_LENGTH;
+  for (i = 0; i < FFT_LENGTH; i++)
+    sine_test_input[i] = i * 2 * PI / FFT_LENGTH;
   /* generate sine */
-  for(i = 0; i < FFT_LENGTH; i++)
-    sine_test_input[i] = (sin(sine_test_input[i]) + sin(2*sine_test_input[i]))*0.5 + 1.0;
+  for (i = 0; i < FFT_LENGTH; i++)
+    sine_test_input[i] = (sin(sine_test_input[i])
+        + 0.5 * sin(3 * sine_test_input[i]) + 0.25 * sin(5 * sine_test_input[i])
+        + 0.15 * sin(7 * sine_test_input[i]));
 }
 
 //void fft_test()
@@ -62,112 +63,83 @@ void generate_input()
 ////  arm_cmplx_mag_f32(testOutput, testOutput, FFT_LENGTH/2);
 //}
 
-void fft(arm_rfft_fast_instance_f32 *S, float32_t *input_arr, float32_t *output_arr)
+void fft(arm_rfft_fast_instance_f32 *S, float32_t *input_arr,
+    float32_t *output_arr)
 {
 
   /* Process the data through the CFFT/CIFFT module */
   arm_rfft_fast_f32(S, input_arr, output_arr, 0);
 
   /* Process the data through the Complex Magnitude Module for
-  calculating the magnitude at each bin */
-  arm_cmplx_mag_f32(output_arr, output_arr, FFT_LENGTH/2);
+   calculating the magnitude at each bin */
+  arm_cmplx_mag_f32(output_arr, output_arr, FFT_LENGTH / 2);
   collect_fft_samples = 0;
 }
 
 void fft_compute()
 {
   uint16_t i;
+  float32_t sum_of_squares;
 
   /* initialisation */
-  arm_rfft_fast_init_f32(&rfft_fast_len256,FFT_LENGTH);
+  arm_rfft_fast_init_f32(&rfft_fast_len256, FFT_LENGTH);
 
   /* voltage array */
-  for(i = 0; i < FFT_LENGTH; i++)
-    fft_input_array[i] = norm_Vinst_IQ_samples[i]/16777216.0;
+  for (i = 0; i < FFT_LENGTH; i++)
+    fft_input_array[i] = norm_Vinst_IQ_samples[i] / 16777216.0;
+//    fft_input_array[i] = sine_test_input[i];
   fft(&rfft_fast_len256, fft_input_array, fft_output_array_voltage);
 
   /* current array */
-  for(i = 0; i < FFT_LENGTH; i++)
-    fft_input_array[i] = norm_Iinst_IQ_samples[i]/16777216.0;
+  for (i = 0; i < FFT_LENGTH; i++)
+    fft_input_array[i] = norm_Iinst_IQ_samples[i] / 16777216.0;
   fft(&rfft_fast_len256, fft_input_array, fft_output_array_current);
 
-//    buff1[i] = norm_Vinst_IQ_samples[i]/16777216.0;
+  /* THD computation */
+  /* THD = sqrt(V2^2 + V3^2 + V4^2 + V5^2 + ...) / V1
+   * V1: Rms of fundamental component
+   * V2, V3, V4.. : rms of harmonic components
+   *
+   * Note: Actual amplitudes are used instead of rms values. Needs to be
+   * verified if this approach is correct
+   * TODO: verify THD calculation approach
+   */
 
-//  fft1(256,8);
-//  for(i = 0; i < FFT_LENGTH; i++)
-//    fft_output_array_voltage[i] = buff1[i];
+  /* Voltage THD computation */
+  /* the FFT results are scaled by FFT_LENGTH/2. Normalise them first */
+  for (i = 0; i < FFT_LENGTH / 2; i++)
+  {
+    fft_output_array_voltage[i] = fft_output_array_voltage[i]
+        / (FFT_LENGTH / 2);
+  }
 
-//  /* current array */
-//  for(i = 0; i < FFT_LENGTH; i++)
-//    fft_input_array[i] = _IQtoF(norm_Iinst_IQ_samples[i]);
-//  fft(&rfft_fast_len256, fft_input_array,fft_output_array_current);
+  /* now ingore first 2 points corresponding to dc and fundamental and do a sum of squares of the rest */
+  sum_of_squares = 0;
+  for (i = 2; i < FFT_LENGTH / 2; i++)
+  {
+    sum_of_squares +=
+        (fft_output_array_voltage[i] * fft_output_array_voltage[i]);
+  }
+
+  /* now, thd = sqrt(sum_of_squares)/v1 */
+  ac_metrics.Vthd = sqrt(sum_of_squares) / fft_output_array_voltage[1];
+
+  /* Current THD computation */
+  /* the FFT results are scaled by FFT_LENGTH/2. Normalise them first */
+  for (i = 0; i < FFT_LENGTH / 2; i++)
+  {
+    fft_output_array_current[i] = fft_output_array_current[i]
+        / (FFT_LENGTH / 2);
+  }
+
+  /* now ingore first 2 points corresponding to dc and fundamental and do a sum of squares of the rest */
+  sum_of_squares = 0;
+  for (i = 2; i < FFT_LENGTH / 2; i++)
+  {
+    sum_of_squares +=
+        (fft_output_array_current[i] * fft_output_array_current[i]);
+  }
+
+  /* now, thd = sqrt(sum_of_squares)/v1 */
+  ac_metrics.Ithd = sqrt(sum_of_squares) / fft_output_array_current[1];
 }
-
-//void fft1(int n,int m)
-//{
-//
-//  int i,j,k,n1,n2;
-//  double c,s,e,a,t1,t2;
-//  double y[256]={0.0};
-//
-//
-//  j = 0; /* bit-reverse */
-//  n2 = n/2;
-//  for (i=1; i < n - 1; i++)
-//  {
-//      n1 = n2;
-//      while ( j >= n1 )
-//      {
-//        j = j - n1;
-//        n1 = n1/2;
-//      }
-//      j = j + n1;
-//
-//      if (i < j)
-//      {
-//        t1 = buff1[i];
-//        buff1[i] = buff1[j];
-//        buff1[j] = t1;
-//        t1 = y[i];
-//        y[i] = y[j];
-//        y[j] = t1;
-//      }
-//  }
-//
-//
-//  n1 = 0; /* FFT */
-//  n2 = 1;
-//
-//  for (i=0; i < m; i++)
-//  {
-//      n1 = n2;
-//      n2 = n2 + n2;
-//      e = -6.283185307179586/n2;
-//      a = 0.0;
-//
-//      for (j=0; j < n1; j++)
-//      {
-//        c = cos(a);
-//        s = sin(a);
-//        a = a + e;
-//
-//        for (k=j; k < n; k=k+n2)
-//        {
-//            t1 = c*buff1[k+n1] - s*y[k+n1];
-//            t2 = s*buff1[k+n1] + c*y[k+n1];
-//            buff1[k+n1] = buff1[k] - t1;
-//            y[k+n1] = y[k] - t2;
-//            buff1[k] = buff1[k] + t1;
-//            y[k] = y[k] + t2;
-//
-//        }
-//      }
-//  }
-//  for(k=0;k<256;k++)
-//  {
-//
-//    buff1[k]=sqrt(buff1[k]*buff1[k]+y[k]*y[k]);
-//  }
-//
-//}
-

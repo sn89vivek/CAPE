@@ -9,6 +9,7 @@
 #define SRC_COMMON_DEVICE_H_
 
 #include <stdint.h>
+#include <stdio.h>
 #include <stdbool.h>
 #include "tm4c1294ncpdt.h"
 #include "inc/hw_memmap.h"
