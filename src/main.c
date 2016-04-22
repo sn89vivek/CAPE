@@ -57,6 +57,8 @@ char display_update_buffer6[10];
 char display_update_buffer7[10];
 char display_update_buffer8[10];
 char display_update_buffer9[10];
+char display_update_buffer10[10];
+char display_update_buffer11[10];
 uint32_t g_ui32SysClock;
 
 int main(void)
@@ -240,7 +242,7 @@ int main(void)
           CanvasTextSet(&g_sFreqValue, (const char * )display_update_buffer3);
 
           // Updating Power Factor //
-          sprintf(display_update_buffer4, "%.1f",
+          sprintf(display_update_buffer4, "%.2f",
               ac_metrics.P_PowerFactor / IQ24toFloat);
           CanvasTextSet(&g_sPFValue, (const char * )display_update_buffer4);
 
@@ -269,11 +271,20 @@ int main(void)
               ac_metrics.Phase_shift * (180 / PI) / IQ24toFloat);
           CanvasTextSet(&g_sPhase_val, (const char * )display_update_buffer9);
 
+          sprintf(display_update_buffer10, "%.1f V",
+                 ac_metrics.V_Peak * V_FULL_SCALE/ IQ24toFloat);
+         CanvasTextSet(&g_sVpeak_val, (const char * )display_update_buffer10);
+         ac_metrics.V_Peak = 0;
+
+         sprintf(display_update_buffer11, "%.1f A",
+              ac_metrics.I_Peak * I_FULL_SCALE/ IQ24toFloat);
+         CanvasTextSet(&g_sIpeak_val, (const char * )display_update_buffer11);
+         ac_metrics.I_Peak = 0;
+
           WidgetPaint(WIDGET_ROOT);  // painting the updated canvases
         }
         else if (g_iPage == PAGE_VOLTAGE_SPECTRUM)
         {
-
           Display_FreqSpectrum(VOLTAGE_SPECTRUM);
         }
         else if (g_iPage == PAGE_CURRENT_SPECTRUM)
@@ -289,7 +300,6 @@ int main(void)
       {
         time_domain_disp_count++;
       }
-
     }
   }
 }
@@ -341,6 +351,13 @@ void sys_tick_handler()
     ac_metrics.P_inst_acc += _IQmpy(
         (_Q12toIQ24(((int32_t)ac_raw_adc_counts[0]))-_IQ(ADC_LEVEL_SHIFT)),
         (_Q12toIQ24((int32_t)ac_raw_adc_counts[1])-_IQ(ADC_LEVEL_SHIFT)));
+
+    /* Calculating Vpeak and IPeak */
+    if(_IQabs(_Q12toIQ24((int32_t)ac_raw_adc_counts[0])-_IQ(ADC_LEVEL_SHIFT)) > ac_metrics.V_Peak)
+      ac_metrics.V_Peak = _IQabs(_Q12toIQ24((int32_t)ac_raw_adc_counts[0])-_IQ(ADC_LEVEL_SHIFT));
+
+    if(_IQabs(_Q12toIQ24((int32_t)ac_raw_adc_counts[1])-_IQ(ADC_LEVEL_SHIFT)) > ac_metrics.I_Peak)
+          ac_metrics.I_Peak = _IQabs(_Q12toIQ24((int32_t)ac_raw_adc_counts[1])-_IQ(ADC_LEVEL_SHIFT));
   }
 
   /* For PLL debug */
@@ -381,8 +398,6 @@ void sys_tick_handler()
     /* Calculate Phase Shift b/w sinusoid current and voltage waveform */
     ac_metrics.Phase_shift = _IQacos(
         _IQdiv(ac_metrics.P_active,ac_metrics.P_apparent));
-
-    // ac_metrics.frqequncy =
 
     /* Scheduler Flag is set to true once a cycle  */
     scheduler_flag = true;

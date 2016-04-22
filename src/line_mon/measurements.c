@@ -48,5 +48,7 @@ void init_adc()
   ac_metrics.P_apparent = 0;
   ac_metrics.P_reactive = 0;
   ac_metrics.P_PowerFactor = 0;
+  ac_metrics.V_Peak = 0;
+  ac_metrics.I_Peak = 0;
 }
 

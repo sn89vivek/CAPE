@@ -93,9 +93,25 @@ Canvas(g_sPhase, &g_sTHDv_val, 0, &g_sPhase_val, &g_sKentec320x240x16_SSD2119,
     0, 210, 60, 28, CANVAS_STYLE_TEXT | CANVAS_STYLE_TEXT_LEFT, 0, ClrCUYellow,
     ClrCUYellow, &g_sFontCm16b, "Phase", 0, 0);
 
-Canvas(g_sPhase_val, &g_sPhase, 0, 0, &g_sKentec320x240x16_SSD2119, 55, 210, 60,
+Canvas(g_sPhase_val, &g_sPhase, 0, &g_sVpeak, &g_sKentec320x240x16_SSD2119, 55, 210, 60,
     28, CANVAS_STYLE_FILL | CANVAS_STYLE_TEXT, ClrCUYellow, 0, ClrBlack,
     &g_sFontCm18, "7.5 %", 0, 0);
+
+Canvas(g_sVpeak, &g_sPhase_val, 0, &g_sVpeak_val, &g_sKentec320x240x16_SSD2119, 204,
+    180, 60, 28, CANVAS_STYLE_TEXT | CANVAS_STYLE_TEXT_LEFT, 0, ClrCUYellow,
+    ClrCUYellow, &g_sFontCm16b, "Vpk", 0, 0);
+
+Canvas(g_sVpeak_val, &g_sVpeak, 0, &g_sIpeak, &g_sKentec320x240x16_SSD2119, 259,
+    180, 60, 28, CANVAS_STYLE_FILL | CANVAS_STYLE_TEXT, ClrCUYellow, 0,
+    ClrBlack, &g_sFontCm18, "155.5 V", 0, 0);
+
+Canvas(g_sIpeak, &g_sVpeak_val, 0, &g_sIpeak_val, &g_sKentec320x240x16_SSD2119,
+    204, 210, 60, 28, CANVAS_STYLE_TEXT | CANVAS_STYLE_TEXT_LEFT, 0, ClrCUYellow,
+    ClrCUYellow, &g_sFontCm16b, "Ipk", 0, 0);
+
+Canvas(g_sIpeak_val, &g_sIpeak, 0, 0, &g_sKentec320x240x16_SSD2119, 259, 210, 60,
+    28, CANVAS_STYLE_FILL | CANVAS_STYLE_TEXT, ClrCUYellow, 0, ClrBlack,
+    &g_sFontCm18, "1.5 A", 0, 0);
 
 RectangularButton(g_sNext, 0, 0, 0, &g_sKentec320x240x16_SSD2119, 296, 0, 23,
     23, PB_STYLE_IMG, ClrCUYellow, ClrCUYellow, 0, 0, 0, 0, g_pui8Right24x23,
@@ -277,7 +293,7 @@ void Display_FreqSpectrum(uint8_t param)
     {
       /* Scale the frequency bin values with the y axis span of the spectrum canvas */
       frequency_bins[i] = 229
-          - (int32_t) (fft_output_array_current[i] * (240.0 - 40.0));
+          - (int32_t) (fft_output_array_current[i] * 25 * (240.0 - 40.0));
     }
   }
 
@@ -292,12 +308,19 @@ void Display_FreqSpectrum(uint8_t param)
   fft_output_array_voltage[0] = CURRENT_SPECTRUM;
 }
 
+
+
+#define VOLTAGE_YAXIS    80
+#define CURRENT_YAXIS    180
+
+
 void Display_TimeDomain(void)
 {
   uint32_t XPixelCurrent = 0;
-  static uint32_t YPixelCurrent[FFT_LENGTH] =
-  { 100 };
-  static uint32_t YPixelPrev[FFT_LENGTH] =
+  uint32_t YPixelCurrent[FFT_LENGTH];
+  static uint32_t YPixelPrev_Volt[FFT_LENGTH] =
+  { 0 };
+  static uint32_t YPixelPrev_Curr[FFT_LENGTH] =
   { 0 };
   uint32_t DataCount = 0;
 
@@ -310,7 +333,8 @@ void Display_TimeDomain(void)
 //
 //  GrRectFill(&sContext, &sRect);
   GrContextForegroundSet(&sContext, ClrSilver);
-  GrLineDrawH(&sContext, 0, 319, 100);
+  GrLineDrawV(&sContext,0,30, 239);
+  GrLineDrawH(&sContext, 0, 319, VOLTAGE_YAXIS);
 
   DataCount = 0;
   while (DataCount < FFT_LENGTH)
@@ -318,13 +342,17 @@ void Display_TimeDomain(void)
 //    GrContextForegroundSet(&sContext, ClrBlack);
 //    GrPixelDraw(&sContext,XPixelCurrent,YPixelPrev[DataCount]);
 //    if(DataCount != 0)
-    YPixelCurrent[DataCount] = 100
-        - 100 * ((norm_Vinst_IQ_samples[DataCount]) / 16777216.0);
+    YPixelCurrent[DataCount] = VOLTAGE_YAXIS
+        - VOLTAGE_YAXIS * ((norm_Vinst_IQ_samples[DataCount]) / 16777216.0);
     if (DataCount != 0)
     {
       GrContextForegroundSet(&sContext, ClrBlack);
-      GrLineDraw(&sContext, XPixelCurrent - 1, YPixelPrev[DataCount - 1],
-          XPixelCurrent, YPixelPrev[DataCount]);
+      /* Clear the previous cycle's data */
+      if (YPixelPrev_Volt[DataCount] != 0)
+      {
+        GrLineDraw(&sContext, XPixelCurrent - 1, YPixelPrev_Volt[DataCount - 1],
+            XPixelCurrent, YPixelPrev_Volt[DataCount]);
+      }
       GrContextForegroundSet(&sContext, ClrCUYellow);
       GrLineDraw(&sContext, XPixelCurrent - 1, YPixelCurrent[DataCount - 1],
           XPixelCurrent, YPixelCurrent[DataCount]);
@@ -336,7 +364,44 @@ void Display_TimeDomain(void)
   DataCount = 0;
   while (DataCount < FFT_LENGTH)
   {
-    YPixelPrev[DataCount] = YPixelCurrent[DataCount];
+    YPixelPrev_Volt[DataCount] = YPixelCurrent[DataCount];
+    DataCount++;
+  }
+
+  /* For current */
+  GrContextForegroundSet(&sContext, ClrSilver);
+  GrLineDrawH(&sContext, 0, 319, CURRENT_YAXIS);
+
+  DataCount = 0;
+  XPixelCurrent = 0;
+  while (DataCount < FFT_LENGTH)
+  {
+//    GrContextForegroundSet(&sContext, ClrBlack);
+//    GrPixelDraw(&sContext,XPixelCurrent,YPixelPrev[DataCount]);
+//    if(DataCount != 0)
+    YPixelCurrent[DataCount] = CURRENT_YAXIS
+        - CURRENT_YAXIS * ((norm_Iinst_IQ_samples[DataCount])*6 / 16777216.0);
+    if (DataCount != 0)
+    {
+      GrContextForegroundSet(&sContext, ClrBlack);
+      /* Clear the previous cycle's data */
+      if (YPixelPrev_Curr[DataCount] != 0)
+      {
+        GrLineDraw(&sContext, XPixelCurrent - 1, YPixelPrev_Curr[DataCount - 1],
+            XPixelCurrent, YPixelPrev_Curr[DataCount]);
+      }
+      GrContextForegroundSet(&sContext, ClrCUYellow);
+      GrLineDraw(&sContext, XPixelCurrent - 1, YPixelCurrent[DataCount - 1],
+          XPixelCurrent, YPixelCurrent[DataCount]);
+    }
+    DataCount++;
+    XPixelCurrent++;
+  }
+
+  DataCount = 0;
+  while (DataCount < FFT_LENGTH)
+  {
+    YPixelPrev_Curr[DataCount] = YPixelCurrent[DataCount];
     DataCount++;
   }
 }

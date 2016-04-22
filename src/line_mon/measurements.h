@@ -32,6 +32,8 @@ typedef struct
     _iq frqequncy;
     float32_t Vthd;
     float32_t Ithd;
+    _iq V_Peak;
+    _iq I_Peak;
 } ac_metrics_t;
 
 extern ac_metrics_t ac_metrics;

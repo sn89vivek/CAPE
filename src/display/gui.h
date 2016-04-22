@@ -41,7 +41,7 @@ extern tCanvasWidget g_sACMetricsWidget;
 extern tCanvasWidget g_sVrms, g_sVrmsValue, g_sIrms, g_sIrmsValue, g_sFreq,
     g_sFreqValue, g_sPF, g_sPFValue, g_sP_apparent, g_sP_apparent_val,
     g_sP_active, g_sP_active_val, g_sTHDv, g_sTHDv_val, g_sTHDi, g_sTHDi_val,
-    g_sPhase_val, g_sPhase;
+    g_sPhase_val, g_sPhase,g_sVpeak,g_sIpeak,g_sVpeak_val,g_sIpeak_val;
 
 /* Images */
 extern const uint8_t g_pui8Image[];
