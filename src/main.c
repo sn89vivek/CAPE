@@ -60,6 +60,7 @@ char display_update_buffer9[10];
 char display_update_buffer10[10];
 char display_update_buffer11[10];
 uint32_t g_ui32SysClock;
+uint8_t sample_collect = 0;
 
 int main(void)
 {
@@ -185,6 +186,8 @@ int main(void)
 
   ROM_ADCProcessorTrigger(ADC0_BASE, 3);
 
+  sample_collect = 1;
+
   while (1)
   {
     /* Wait for conversion to be completed */
@@ -293,7 +296,9 @@ int main(void)
         }
         else if (g_iPage == PAGE_TIME_DOMAIN_SIGNAL)
         {
+          sample_collect = 0;
           Display_TimeDomain();
+          sample_collect = 1;
         }
       }
       else
@@ -335,6 +340,22 @@ void sys_tick_handler()
       _Q12toIQ24((int32_t)ac_raw_adc_counts[0]) - _IQ(ADC_LEVEL_SHIFT);
       norm_Iinst_IQ_samples[pll_s.sine_index / 2] =
       _Q12toIQ24((int32_t)ac_raw_adc_counts[1]) - _IQ(ADC_LEVEL_SHIFT);
+    }
+
+    /* collect samples for waveform. 128 samples per cycle for the display
+     * Skip alternate samples
+     */
+    if(1)
+    {
+      if(skip_sample == 0)
+      {
+        V_waveform_buffer[wave_index] = _Q12toIQ24((int32_t)ac_raw_adc_counts[0]) - _IQ(ADC_LEVEL_SHIFT);
+        I_waveform_buffer[wave_index] = _Q12toIQ24((int32_t)ac_raw_adc_counts[1]) - _IQ(ADC_LEVEL_SHIFT);
+        wave_index++;
+        if(wave_index == DISPLAY_SAMPLE_SIZE)
+          wave_index = 0;
+      }
+      skip_sample ^= 1;
     }
 
     /* Square and accumulate adc channels (after removing offset) */

@@ -93,24 +93,24 @@ Canvas(g_sPhase, &g_sTHDv_val, 0, &g_sPhase_val, &g_sKentec320x240x16_SSD2119,
     0, 210, 60, 28, CANVAS_STYLE_TEXT | CANVAS_STYLE_TEXT_LEFT, 0, ClrCUYellow,
     ClrCUYellow, &g_sFontCm16b, "Phase", 0, 0);
 
-Canvas(g_sPhase_val, &g_sPhase, 0, &g_sVpeak, &g_sKentec320x240x16_SSD2119, 55, 210, 60,
-    28, CANVAS_STYLE_FILL | CANVAS_STYLE_TEXT, ClrCUYellow, 0, ClrBlack,
-    &g_sFontCm18, "7.5 %", 0, 0);
+Canvas(g_sPhase_val, &g_sPhase, 0, &g_sVpeak, &g_sKentec320x240x16_SSD2119, 55,
+    210, 60, 28, CANVAS_STYLE_FILL | CANVAS_STYLE_TEXT, ClrCUYellow, 0,
+    ClrBlack, &g_sFontCm18, "7.5 %", 0, 0);
 
-Canvas(g_sVpeak, &g_sPhase_val, 0, &g_sVpeak_val, &g_sKentec320x240x16_SSD2119, 204,
-    180, 60, 28, CANVAS_STYLE_TEXT | CANVAS_STYLE_TEXT_LEFT, 0, ClrCUYellow,
-    ClrCUYellow, &g_sFontCm16b, "Vpk", 0, 0);
+Canvas(g_sVpeak, &g_sPhase_val, 0, &g_sVpeak_val, &g_sKentec320x240x16_SSD2119,
+    204, 180, 60, 28, CANVAS_STYLE_TEXT | CANVAS_STYLE_TEXT_LEFT, 0,
+    ClrCUYellow, ClrCUYellow, &g_sFontCm16b, "Vpk", 0, 0);
 
 Canvas(g_sVpeak_val, &g_sVpeak, 0, &g_sIpeak, &g_sKentec320x240x16_SSD2119, 259,
     180, 60, 28, CANVAS_STYLE_FILL | CANVAS_STYLE_TEXT, ClrCUYellow, 0,
     ClrBlack, &g_sFontCm18, "155.5 V", 0, 0);
 
 Canvas(g_sIpeak, &g_sVpeak_val, 0, &g_sIpeak_val, &g_sKentec320x240x16_SSD2119,
-    204, 210, 60, 28, CANVAS_STYLE_TEXT | CANVAS_STYLE_TEXT_LEFT, 0, ClrCUYellow,
-    ClrCUYellow, &g_sFontCm16b, "Ipk", 0, 0);
+    204, 210, 60, 28, CANVAS_STYLE_TEXT | CANVAS_STYLE_TEXT_LEFT, 0,
+    ClrCUYellow, ClrCUYellow, &g_sFontCm16b, "Ipk", 0, 0);
 
-Canvas(g_sIpeak_val, &g_sIpeak, 0, 0, &g_sKentec320x240x16_SSD2119, 259, 210, 60,
-    28, CANVAS_STYLE_FILL | CANVAS_STYLE_TEXT, ClrCUYellow, 0, ClrBlack,
+Canvas(g_sIpeak_val, &g_sIpeak, 0, 0, &g_sKentec320x240x16_SSD2119, 259, 210,
+    60, 28, CANVAS_STYLE_FILL | CANVAS_STYLE_TEXT, ClrCUYellow, 0, ClrBlack,
     &g_sFontCm18, "1.5 A", 0, 0);
 
 RectangularButton(g_sNext, 0, 0, 0, &g_sKentec320x240x16_SSD2119, 296, 0, 23,
@@ -308,42 +308,43 @@ void Display_FreqSpectrum(uint8_t param)
   fft_output_array_voltage[0] = CURRENT_SPECTRUM;
 }
 
-
-
 #define VOLTAGE_YAXIS    80
 #define CURRENT_YAXIS    180
 
+_iq V_waveform_buffer[320] =
+{ 0 };
+_iq I_waveform_buffer[320] =
+{ 0 };
+uint16_t wave_index = 0;
+uint8_t skip_sample = 0;
 
 void Display_TimeDomain(void)
 {
   uint32_t XPixelCurrent = 0;
-  uint32_t YPixelCurrent[FFT_LENGTH];
-  static uint32_t YPixelPrev_Volt[FFT_LENGTH] =
+  uint32_t YPixelCurrent[DISPLAY_SAMPLE_SIZE];
+  static uint32_t YPixelPrev_Volt[DISPLAY_SAMPLE_SIZE] =
   { 0 };
-  static uint32_t YPixelPrev_Curr[FFT_LENGTH] =
+  static uint32_t YPixelPrev_Curr[DISPLAY_SAMPLE_SIZE] =
   { 0 };
   uint32_t DataCount = 0;
 
-  /*Wipe the previous FFT*/
-//  sRect.i16XMin = 0;
-//  sRect.i16YMin = 29;
-//  sRect.i16XMax = 319;
-//  sRect.i16YMax = 239;
-//  GrContextForegroundSet(&sContext, ClrBlack);
-//
-//  GrRectFill(&sContext, &sRect);
-  GrContextForegroundSet(&sContext, ClrSilver);
-  GrLineDrawV(&sContext,0,30, 239);
+  GrContextForegroundSet(&sContext, ClrCUYellow);
+  GrContextFontSet(&sContext, &g_sFontCm16b);
+  GrStringDrawCentered(&sContext, "Voltage", -1, 280, 31, 0);
+  GrStringDrawCentered(&sContext, "Current", -1, 280, 131, 0);
+
+  GrContextForegroundSet(&sContext, ClrWhite);
+  GrLineDrawV(&sContext, 0, 30, 239);
   GrLineDrawH(&sContext, 0, 319, VOLTAGE_YAXIS);
 
   DataCount = 0;
-  while (DataCount < FFT_LENGTH)
+  while (DataCount < DISPLAY_SAMPLE_SIZE)
   {
 //    GrContextForegroundSet(&sContext, ClrBlack);
 //    GrPixelDraw(&sContext,XPixelCurrent,YPixelPrev[DataCount]);
 //    if(DataCount != 0)
     YPixelCurrent[DataCount] = VOLTAGE_YAXIS
-        - VOLTAGE_YAXIS * ((norm_Vinst_IQ_samples[DataCount]) / 16777216.0);
+        - VOLTAGE_YAXIS * ((V_waveform_buffer[DataCount]) / 16777216.0);
     if (DataCount != 0)
     {
       GrContextForegroundSet(&sContext, ClrBlack);
@@ -362,25 +363,25 @@ void Display_TimeDomain(void)
   }
 
   DataCount = 0;
-  while (DataCount < FFT_LENGTH)
+  while (DataCount < DISPLAY_SAMPLE_SIZE)
   {
     YPixelPrev_Volt[DataCount] = YPixelCurrent[DataCount];
     DataCount++;
   }
 
   /* For current */
-  GrContextForegroundSet(&sContext, ClrSilver);
+  GrContextForegroundSet(&sContext, ClrWhite);
   GrLineDrawH(&sContext, 0, 319, CURRENT_YAXIS);
 
   DataCount = 0;
   XPixelCurrent = 0;
-  while (DataCount < FFT_LENGTH)
+  while (DataCount < DISPLAY_SAMPLE_SIZE)
   {
 //    GrContextForegroundSet(&sContext, ClrBlack);
 //    GrPixelDraw(&sContext,XPixelCurrent,YPixelPrev[DataCount]);
 //    if(DataCount != 0)
     YPixelCurrent[DataCount] = CURRENT_YAXIS
-        - CURRENT_YAXIS * ((norm_Iinst_IQ_samples[DataCount])*6 / 16777216.0);
+        - CURRENT_YAXIS * ((I_waveform_buffer[DataCount]) * 6 / 16777216.0);
     if (DataCount != 0)
     {
       GrContextForegroundSet(&sContext, ClrBlack);
@@ -399,7 +400,7 @@ void Display_TimeDomain(void)
   }
 
   DataCount = 0;
-  while (DataCount < FFT_LENGTH)
+  while (DataCount < DISPLAY_SAMPLE_SIZE)
   {
     YPixelPrev_Curr[DataCount] = YPixelCurrent[DataCount];
     DataCount++;

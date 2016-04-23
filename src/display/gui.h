@@ -35,6 +35,8 @@ extern int8_t g_iPage;
 
 #define LAST_PAGE     3
 
+#define DISPLAY_SAMPLE_SIZE   256
+
 /* Widgets */
 extern tPushButtonWidget g_sPushBtn;
 extern tCanvasWidget g_sACMetricsWidget;
@@ -53,6 +55,12 @@ extern const uint8_t g_pui8LeftSmall15x14[];
 /* gui context */
 extern tContext sContext;
 extern tRectangle sRect;
+
+/* waveform control */
+extern _iq V_waveform_buffer[320];
+extern _iq I_waveform_buffer[320];
+extern uint16_t wave_index;
+extern uint8_t skip_sample;
 
 /* Global functions */
 extern void Display_FreqSpectrum(uint8_t param);
