@@ -44,6 +44,7 @@ static void IntDefaultHandler(void);
 extern void sys_tick_handler();
 extern void timer0_isr_handler();
 extern void TouchScreenIntHandler(void);
+extern void lwIPEthernetIntHandler(void);
 
 //*****************************************************************************
 //
@@ -127,7 +128,7 @@ void (* const g_pfnVectors[])(void) =
     IntDefaultHandler,                      // I2C1 Master and Slave
     IntDefaultHandler,                      // CAN0
     IntDefaultHandler,                      // CAN1
-    IntDefaultHandler,                      // Ethernet
+    lwIPEthernetIntHandler,                 // Ethernet
     IntDefaultHandler,                      // Hibernate
     IntDefaultHandler,                      // USB0
     IntDefaultHandler,                      // PWM Generator 3

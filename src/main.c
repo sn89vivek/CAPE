@@ -35,6 +35,9 @@
 #include "drivers/touch.h"
 #include "gui.h"
 
+#include "utils/uartstdio.h"
+#include "enet_datalogger.h"
+#include "drivers/pinout.h"
 volatile uint8_t scheduler_flag;
 
 //TODO: THD power
@@ -64,6 +67,16 @@ uint8_t sample_collect = 0;
 
 int main(void)
 {
+  /* from enet_lwip prj */
+  // For ethernet. Checking clock
+  //
+  // Make sure the main oscillator is enabled because this is required by
+  // the PHY.  The system must have a 25MHz crystal attached to the OSC
+  // pins. The SYSCTL_MOSC_HIGHFREQ parameter is used when the crystal
+  // frequency is 10MHz or higher.
+  //
+  SysCtlMOSCConfigSet(SYSCTL_MOSC_HIGHFREQ);
+
   //
   // Set the clocking to run directly from the crystal at 120MHz.
   //
@@ -71,6 +84,18 @@ int main(void)
   SYSCTL_OSC_MAIN | SYSCTL_USE_PLL |
   SYSCTL_CFG_VCO_480), 120000000);
 
+  //
+  // Configure the device pins.
+  //
+  PinoutSet(true, false);
+
+  //
+  // Configure UART.
+  //
+  UARTStdioConfig(0, 115200, g_ui32SysClock);
+
+  // Uart test
+  UARTprintf("Uart functional...\n\r");
   FPUEnable();
   FPULazyStackingEnable();
 
@@ -83,6 +108,7 @@ int main(void)
   init_adc();
 
   gui_init();
+  enet_init();
 
   //
   // Enable the GPIO port that is used for the on-board LED.
@@ -186,6 +212,8 @@ int main(void)
 
   ROM_ADCProcessorTrigger(ADC0_BASE, 3);
 
+  server_connect();
+
   sample_collect = 1;
 
   while (1)
@@ -274,15 +302,17 @@ int main(void)
               ac_metrics.Phase_shift * (180 / PI) / IQ24toFloat);
           CanvasTextSet(&g_sPhase_val, (const char * )display_update_buffer9);
 
+          // Vpeak
           sprintf(display_update_buffer10, "%.1f V",
-                 ac_metrics.V_Peak * V_FULL_SCALE/ IQ24toFloat);
-         CanvasTextSet(&g_sVpeak_val, (const char * )display_update_buffer10);
-         ac_metrics.V_Peak = 0;
+              ac_metrics.V_Peak * V_FULL_SCALE / IQ24toFloat);
+          CanvasTextSet(&g_sVpeak_val, (const char * )display_update_buffer10);
+          ac_metrics.V_Peak = 0;
 
-         sprintf(display_update_buffer11, "%.1f A",
-              ac_metrics.I_Peak * I_FULL_SCALE/ IQ24toFloat);
-         CanvasTextSet(&g_sIpeak_val, (const char * )display_update_buffer11);
-         ac_metrics.I_Peak = 0;
+          // Ipeak
+          sprintf(display_update_buffer11, "%.1f A",
+              ac_metrics.I_Peak * I_FULL_SCALE / IQ24toFloat);
+          CanvasTextSet(&g_sIpeak_val, (const char * )display_update_buffer11);
+          ac_metrics.I_Peak = 0;
 
           WidgetPaint(WIDGET_ROOT);  // painting the updated canvases
         }
@@ -305,6 +335,14 @@ int main(void)
       {
         time_domain_disp_count++;
       }
+
+      if(nw_update_timer == 65) // A little above 1 second
+      {
+        nw_update_timer = 0;
+        enet_metrics_log();
+      }
+      else
+        nw_update_timer++;
     }
   }
 }
@@ -345,18 +383,17 @@ void sys_tick_handler()
     /* collect samples for waveform. 128 samples per cycle for the display
      * Skip alternate samples
      */
-    if(1)
+    if (skip_sample == 0)
     {
-      if(skip_sample == 0)
-      {
-        V_waveform_buffer[wave_index] = _Q12toIQ24((int32_t)ac_raw_adc_counts[0]) - _IQ(ADC_LEVEL_SHIFT);
-        I_waveform_buffer[wave_index] = _Q12toIQ24((int32_t)ac_raw_adc_counts[1]) - _IQ(ADC_LEVEL_SHIFT);
-        wave_index++;
-        if(wave_index == DISPLAY_SAMPLE_SIZE)
-          wave_index = 0;
-      }
-      skip_sample ^= 1;
+      V_waveform_buffer[wave_index] =
+      _Q12toIQ24((int32_t)ac_raw_adc_counts[0]) - _IQ(ADC_LEVEL_SHIFT);
+      I_waveform_buffer[wave_index] =
+      _Q12toIQ24((int32_t)ac_raw_adc_counts[1]) - _IQ(ADC_LEVEL_SHIFT);
+      wave_index++;
+      if (wave_index == DISPLAY_SAMPLE_SIZE)
+        wave_index = 0;
     }
+    skip_sample ^= 1;
 
     /* Square and accumulate adc channels (after removing offset) */
     ac_metrics.Vac.norm_acc += _IQmpy(
@@ -374,11 +411,15 @@ void sys_tick_handler()
         (_Q12toIQ24((int32_t)ac_raw_adc_counts[1])-_IQ(ADC_LEVEL_SHIFT)));
 
     /* Calculating Vpeak and IPeak */
-    if(_IQabs(_Q12toIQ24((int32_t)ac_raw_adc_counts[0])-_IQ(ADC_LEVEL_SHIFT)) > ac_metrics.V_Peak)
-      ac_metrics.V_Peak = _IQabs(_Q12toIQ24((int32_t)ac_raw_adc_counts[0])-_IQ(ADC_LEVEL_SHIFT));
+    if (_IQabs(_Q12toIQ24((int32_t)ac_raw_adc_counts[0])-_IQ(ADC_LEVEL_SHIFT))
+        > ac_metrics.V_Peak)
+      ac_metrics.V_Peak = _IQabs(
+          _Q12toIQ24((int32_t)ac_raw_adc_counts[0])-_IQ(ADC_LEVEL_SHIFT));
 
-    if(_IQabs(_Q12toIQ24((int32_t)ac_raw_adc_counts[1])-_IQ(ADC_LEVEL_SHIFT)) > ac_metrics.I_Peak)
-          ac_metrics.I_Peak = _IQabs(_Q12toIQ24((int32_t)ac_raw_adc_counts[1])-_IQ(ADC_LEVEL_SHIFT));
+    if (_IQabs(_Q12toIQ24((int32_t)ac_raw_adc_counts[1])-_IQ(ADC_LEVEL_SHIFT))
+        > ac_metrics.I_Peak)
+      ac_metrics.I_Peak = _IQabs(
+          _Q12toIQ24((int32_t)ac_raw_adc_counts[1])-_IQ(ADC_LEVEL_SHIFT));
   }
 
   /* For PLL debug */
@@ -422,6 +463,9 @@ void sys_tick_handler()
 
     /* Scheduler Flag is set to true once a cycle  */
     scheduler_flag = true;
+
+    /* Ethernet related activity required by lwip */
+    lwIPTimer(SYSTICKMS);
   }
 
   /* Calculate sin */
@@ -465,4 +509,3 @@ void timer0_isr_handler()
 
   TIMER0_ICR_R = 4;
 }
-
